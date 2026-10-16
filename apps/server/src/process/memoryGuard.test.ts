@@ -66,6 +66,13 @@ describe("pickVictim", () => {
   it("does nothing when the server's processes hold little of RAM", () => {
     expect(pickVictim(entries, 100, 128 * GiB)).toBe(undefined);
   });
+
+  it("counts the server's own footprint toward its share of RAM", () => {
+    const heavyServer = entries.map((entry) =>
+      entry.pid === 100 ? { ...entry, bytes: 40 * GiB } : entry,
+    );
+    expect(pickVictim(heavyServer, 100, 128 * GiB)?.pid).toBe(301);
+  });
 });
 
 describe("MemoryGuard.layer", () => {

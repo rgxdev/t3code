@@ -86,7 +86,7 @@ export function pickVictim(
     return { pids, bytes };
   };
 
-  let serverTreeBytes = 0;
+  let serverTreeBytes = entries.find((entry) => entry.pid === serverPid)?.bytes ?? 0;
   let victim: Victim | undefined;
   const stack = (children.get(serverPid) ?? []).map((entry) => ({ entry, parentIsShell: false }));
   while (stack.length > 0) {
