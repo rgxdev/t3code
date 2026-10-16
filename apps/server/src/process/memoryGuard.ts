@@ -7,6 +7,7 @@ import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
 
 import * as ProcessRunner from "../processRunner.ts";
+import * as ServerSettings from "../serverSettings.ts";
 
 const CRITICAL_PRESSURE_LEVEL = 4;
 const MIN_VICTIM_BYTES = 1024 ** 3;
@@ -114,6 +115,11 @@ export function pickVictim(
  */
 const run = Effect.gen(function* () {
   const runner = yield* ProcessRunner.ProcessRunner;
+  const settings = yield* ServerSettings.ServerSettingsService;
+  const enabled = settings.getSettings.pipe(
+    Effect.map((current) => current.memoryGuardEnabled),
+    Effect.orElseSucceed(() => false),
+  );
   const totalMemoryBytes = NodeOS.totalmem();
   const read = (command: string, args: ReadonlyArray<string>) =>
     runner.run({ command, args, timeout: "30 seconds" }).pipe(
@@ -125,6 +131,7 @@ const run = Effect.gen(function* () {
   const kill = (pid: number) => Effect.try(() => process.kill(pid, "SIGKILL")).pipe(Effect.ignore);
 
   const check = Effect.gen(function* () {
+    if (!(yield* enabled)) return;
     const level = yield* read("/usr/sbin/sysctl", ["-n", "kern.memorystatus_vm_pressure_level"]);
     if (level === undefined || Number(level.trim()) < CRITICAL_PRESSURE_LEVEL) return;
     const top = yield* read("/usr/bin/top", ["-l", "1", "-stats", "pid,ppid,mem,command"]);

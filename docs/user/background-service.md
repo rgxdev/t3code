@@ -96,6 +96,16 @@ Downloads, it may need Full Disk Access for the `t3` executable listed in
 For failures after signing in to T3 Connect, see
 [connection troubleshooting](./remote-access.md#t3-connect-troubleshooting).
 
+## Keep a Mac responsive under heavy agent work
+
+Several threads running test suites or builds at once can use more memory than
+a Mac has, until it swaps heavily or freezes. On Linux, T3 Code already limits
+agents' memory. On a Mac, turn on **Settings → General → Memory guard** (web and
+desktop) or **Settings → Maintenance → Memory guard** (mobile). When macOS
+reports critical memory pressure, T3 Code stops the largest command an agent or
+terminal is running. The agent keeps running and sees that command fail, so ask
+it to run fewer suites at once or to limit test workers.
+
 ## Reclaim database space
 
 T3 Code removes superseded internal history on its own while it runs; your

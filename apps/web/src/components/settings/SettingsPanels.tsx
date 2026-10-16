@@ -634,6 +634,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
         ? ["Continue threads after restarts"]
         : []),
+      ...(settings.memoryGuardEnabled !== DEFAULT_UNIFIED_SETTINGS.memoryGuardEnabled
+        ? ["Memory guard"]
+        : []),
       ...(isBackgroundActivityDirty ? ["Background activity"] : []),
       ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
         ? ["New thread mode"]
@@ -708,6 +711,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.persistComposerContextStrip,
       settings.enableProviderUpdateChecks,
       settings.continueThreadsAfterServerUpdate,
+      settings.memoryGuardEnabled,
       settings.sidebarAutoSettleAfterDays,
       settings.sidebarAutoSettleKeepPullRequests,
       settings.sidebarAutoSettleOnMerge,
@@ -818,6 +822,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
       continueThreadsAfterServerUpdate: DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate,
+      memoryGuardEnabled: DEFAULT_UNIFIED_SETTINGS.memoryGuardEnabled,
       backgroundActivity: DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
       backgroundActivityProfile: DEFAULT_UNIFIED_SETTINGS.backgroundActivityProfile,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
@@ -2135,6 +2140,9 @@ export function GeneralSettingsPanel() {
   const environmentId = environment?.environmentId ?? null;
   const isEnvironmentScope = scope.environmentIds.length === 1 && environmentId !== null;
   const hasServerTargets = connectedEnvironments.length > 0;
+  const hasMacServerTarget = connectedEnvironments.some(
+    (candidate) => candidate.serverConfig?.environment.platform.os === "darwin",
+  );
   const [backgroundActivityDialogOpen, setBackgroundActivityDialogOpen] = useState(false);
   const mixedResponseStreamingMode = useScopedSettingsMixed(["responseStreamingMode"]);
   const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
@@ -2879,6 +2887,37 @@ export function GeneralSettingsPanel() {
             />
           }
         />
+
+        {hasMacServerTarget ? (
+          <SettingsRow
+            serverScoped
+            settingKeys={["memoryGuardEnabled"]}
+            {...searchableSetting("memory-guard")}
+            description="On macOS, when memory pressure turns critical, stop the largest command an agent or terminal is running, such as a test suite, so the Mac stays responsive. The agent keeps running and sees the command fail."
+            resetAction={
+              settings.memoryGuardEnabled !== DEFAULT_UNIFIED_SETTINGS.memoryGuardEnabled ? (
+                <SettingResetButton
+                  label="memory guard"
+                  onClick={() =>
+                    updateSettings({
+                      memoryGuardEnabled: DEFAULT_UNIFIED_SETTINGS.memoryGuardEnabled,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <ScopedSwitch
+                settingKeys={["memoryGuardEnabled"]}
+                checked={settings.memoryGuardEnabled}
+                onCheckedChange={(checked) =>
+                  updateSettings({ memoryGuardEnabled: Boolean(checked) })
+                }
+                aria-label="Stop the largest command under critical memory pressure"
+              />
+            }
+          />
+        ) : null}
 
         <SettingsRow
           {...searchableSetting("continue-threads-after-server-update")}

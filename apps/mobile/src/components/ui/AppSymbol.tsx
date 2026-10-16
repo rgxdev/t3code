@@ -45,6 +45,7 @@ import IconTicket from "@tabler/icons-react-native/IconTicket";
 import IconClock from "@tabler/icons-react-native/IconClock";
 import IconCode from "@tabler/icons-react-native/IconCode";
 import IconCopy from "@tabler/icons-react-native/IconCopy";
+import IconCpu from "@tabler/icons-react-native/IconCpu";
 import IconDatabase from "@tabler/icons-react-native/IconDatabase";
 import IconDeviceDesktop from "@tabler/icons-react-native/IconDeviceDesktop";
 import IconDeviceLaptop from "@tabler/icons-react-native/IconDeviceLaptop";
@@ -240,6 +241,7 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "point.topleft.down.curvedto.point.bottomright.up": IconGitMerge,
   safari: IconExternalLink,
   "server.rack": IconServer,
+  memorychip: IconCpu,
   stethoscope: IconStethoscope,
   "sidebar.left": IconLayoutSidebar,
   "sidebar.right": IconLayoutSidebarRight,

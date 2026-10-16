@@ -6,8 +6,10 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import { TestClock } from "effect/testing";
 
 import * as ProcessRunner from "../processRunner.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import * as MemoryGuard from "./memoryGuard.ts";
 import { parseTopProcesses, pickVictim } from "./memoryGuard.ts";
 
@@ -76,6 +78,41 @@ describe("pickVictim", () => {
 });
 
 describe("MemoryGuard.layer", () => {
+  const guard = (memoryGuardEnabled: boolean, stdoutFor: (command: string) => string) =>
+    MemoryGuard.layer.pipe(
+      Layer.provide(
+        Layer.succeed(ProcessRunner.ProcessRunner, {
+          run: (input) =>
+            Effect.succeed({
+              stdout: stdoutFor(input.command),
+              stderr: "",
+              code: ChildProcessSpawner.ExitCode(0),
+              timedOut: false,
+              stdoutTruncated: false,
+              stderrTruncated: false,
+              stdoutInvalidUtf8: false,
+              stderrInvalidUtf8: false,
+            }),
+        }),
+      ),
+      Layer.provide(ServerSettings.ServerSettingsService.layerTest({ memoryGuardEnabled })),
+      Layer.provide(Layer.succeed(HostProcess.Platform, "darwin")),
+    );
+
+  it.effect("spawns nothing while the setting is off", () =>
+    Effect.gen(function* () {
+      const commands: Array<string> = [];
+      yield* Layer.build(
+        guard(false, (command) => {
+          commands.push(command);
+          return "4\n";
+        }),
+      );
+      yield* TestClock.adjust("1 minute");
+      expect(commands).toEqual([]);
+    }).pipe(Effect.scoped),
+  );
+
   it.live.skipIf(HostProcess.Platform.defaultValue() === "win32")(
     "kills the command a shell runs once memory pressure is critical",
     () =>
@@ -103,26 +140,7 @@ describe("MemoryGuard.layer", () => {
           `${shell.pid} ${process.pid} 1M sh`,
           `${commandPid} ${shell.pid} 1T sleep`,
         ].join("\n");
-        const runner = Layer.succeed(ProcessRunner.ProcessRunner, {
-          run: (input) =>
-            Effect.succeed({
-              stdout: input.command.endsWith("sysctl") ? "4\n" : top,
-              stderr: "",
-              code: ChildProcessSpawner.ExitCode(0),
-              timedOut: false,
-              stdoutTruncated: false,
-              stderrTruncated: false,
-              stdoutInvalidUtf8: false,
-              stderrInvalidUtf8: false,
-            }),
-        });
-
-        yield* Layer.build(
-          MemoryGuard.layer.pipe(
-            Layer.provide(runner),
-            Layer.provide(Layer.succeed(HostProcess.Platform, "darwin")),
-          ),
-        );
+        yield* Layer.build(guard(true, (command) => (command.endsWith("sysctl") ? "4\n" : top)));
         yield* Effect.promise(() => shellExited);
 
         expect(() => process.kill(commandPid, 0)).toThrow();

@@ -229,6 +229,9 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
     (target) =>
       target.environment.serverConfig.environment.capabilities.threadRestartContinuation === true,
   );
+  const hasMacTarget = targets.some(
+    (target) => target.environment.serverConfig.environment.platform.os === "darwin",
+  );
   const disabledFor = (key: string) =>
     disabled ||
     (projectSelected &&
@@ -489,6 +492,22 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                       />
                     </View>
                   </SettingsSection>
+                  {hasMacTarget ? (
+                    <SettingsSection title="Memory">
+                      <SettingsSwitchRow
+                        icon="memorychip"
+                        label="Memory guard"
+                        subtitle={
+                          projectSelected
+                            ? "Environment-wide setting. Select All projects to change it."
+                            : "On macOS, stop the largest command an agent or terminal is running when memory pressure turns critical. The agent keeps running."
+                        }
+                        value={uniform("memoryGuardEnabled")}
+                        disabled={disabledFor("memoryGuardEnabled")}
+                        onValueChange={(value) => write({ memoryGuardEnabled: value })}
+                      />
+                    </SettingsSection>
+                  ) : null}
                 </>
               ) : null}
             </>

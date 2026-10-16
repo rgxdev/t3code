@@ -434,6 +434,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     scope: "environment-defaults",
   },
   {
+    id: "memory-guard",
+    title: "Memory guard",
+    to: "/settings/general",
+    searchTerms: ["ram memory pressure swap freeze crash kill tests macos"],
+    scope: "environment-defaults",
+    macProviderSettingsOnly: true,
+  },
+  {
     id: "continue-threads-after-server-update",
     title: "Continue threads after restarts",
     to: "/settings/general",
