@@ -17,6 +17,7 @@ import * as Path from "effect/Path";
 
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import * as MemoryGuard from "./memoryGuard.ts";
 
 const AGENT_SLICE = "app-t3code-agents.slice";
 
@@ -93,6 +94,7 @@ const MAX_TRACKED_THREADS = 500;
 
 export const make = Effect.gen(function* () {
   const platform = yield* HostProcess.Platform;
+  if (platform === "darwin") yield* Effect.forkScoped(MemoryGuard.run);
   if (platform !== "linux") return AgentScope.defaultValue();
 
   const runner = yield* ProcessRunner.ProcessRunner;
