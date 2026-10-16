@@ -1,5 +1,14 @@
-import { describe, expect, it } from "@effect/vitest";
+// @effect-diagnostics nodeBuiltinImport:off -- the guard has to kill a real process tree.
+import * as NodeChildProcess from "node:child_process";
 
+import { describe, expect, it } from "@effect/vitest";
+import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+
+import * as ProcessRunner from "../processRunner.ts";
+import * as MemoryGuard from "./memoryGuard.ts";
 import { parseTopProcesses, pickVictim } from "./memoryGuard.ts";
 
 const GiB = 1024 ** 3;
@@ -57,4 +66,59 @@ describe("pickVictim", () => {
   it("does nothing when the server's processes hold little of RAM", () => {
     expect(pickVictim(entries, 100, 128 * GiB)).toBe(undefined);
   });
+});
+
+describe("MemoryGuard.layer", () => {
+  it.live.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "kills the command a shell runs once memory pressure is critical",
+    () =>
+      Effect.gen(function* () {
+        const shell = NodeChildProcess.spawn("/bin/sh", ["-c", "sleep 600 & echo $!; wait"], {
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+        const shellExited = new Promise<void>((resolve) => shell.once("exit", () => resolve()));
+        const commandPid = yield* Effect.promise(
+          () =>
+            new Promise<number>((resolve) =>
+              shell.stdout.once("data", (data) => resolve(Number(String(data).trim()))),
+            ),
+        );
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            shell.kill("SIGKILL");
+            try {
+              process.kill(commandPid, "SIGKILL");
+            } catch {}
+          }),
+        );
+        const top = [
+          `${process.pid} 1 300M node`,
+          `${shell.pid} ${process.pid} 1M sh`,
+          `${commandPid} ${shell.pid} 1T sleep`,
+        ].join("\n");
+        const runner = Layer.succeed(ProcessRunner.ProcessRunner, {
+          run: (input) =>
+            Effect.succeed({
+              stdout: input.command.endsWith("sysctl") ? "4\n" : top,
+              stderr: "",
+              code: ChildProcessSpawner.ExitCode(0),
+              timedOut: false,
+              stdoutTruncated: false,
+              stderrTruncated: false,
+              stdoutInvalidUtf8: false,
+              stderrInvalidUtf8: false,
+            }),
+        });
+
+        yield* Layer.build(
+          MemoryGuard.layer.pipe(
+            Layer.provide(runner),
+            Layer.provide(Layer.succeed(HostProcess.Platform, "darwin")),
+          ),
+        );
+        yield* Effect.promise(() => shellExited);
+
+        expect(() => process.kill(commandPid, 0)).toThrow();
+      }).pipe(Effect.scoped),
+  );
 });
