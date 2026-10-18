@@ -21,6 +21,13 @@ import { OpenInPicker } from "./OpenInPicker";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
 import { ThreadAutomationsPanel } from "./ThreadAutomationsPanel";
 import { ThreadRelationshipsPanel } from "./ThreadRelationshipsControl";
+import { GaugeIcon } from "lucide-react";
+import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
+import {
+  THREAD_DETAILS_PANEL_ICON_CLASS,
+  THREAD_DETAILS_PANEL_LABEL_CLASS,
+  THREAD_DETAILS_PANEL_ROW_CLASS,
+} from "./threadDetailsPanelStyles";
 
 const GitActionsControl = memo(BaseGitActionsControl);
 
@@ -61,6 +68,7 @@ export interface ThreadDetailsPanelProps extends Pick<
     input: NewProjectScriptInput,
   ) => Promise<ProjectScriptActionResult>;
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
+  contextWindow?: ContextWindowSnapshot | null;
 }
 
 export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
@@ -142,6 +150,22 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                   onUpdateScript={props.onUpdateProjectScript}
                   onDeleteScript={props.onDeleteProjectScript}
                 />
+              ) : null}
+
+              {props.contextWindow ? (
+                <div className={`flex items-center ${THREAD_DETAILS_PANEL_ROW_CLASS}`}>
+                  <GaugeIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
+                  <span className={`flex-1 ${THREAD_DETAILS_PANEL_LABEL_CLASS}`}>Context</span>
+                  <span className="font-mono text-2xs tabular-nums text-muted-foreground">
+                    {props.contextWindow.usedPercentage !== null
+                      ? `${Math.round(props.contextWindow.usedPercentage)}% · `
+                      : ""}
+                    {formatContextWindowTokens(props.contextWindow.usedTokens)}
+                    {props.contextWindow.maxTokens != null
+                      ? `/${formatContextWindowTokens(props.contextWindow.maxTokens)}`
+                      : ""}
+                  </span>
+                </div>
               ) : null}
             </div>
           </ThreadDetailsSection>
