@@ -8390,7 +8390,7 @@ export default function ChatView(props: ChatViewProps) {
               forceNewWorktree={multipleModelSelections !== null}
               environmentId={activeThread.environmentId}
               threadId={activeThread.id}
-              contextWindow={activeContextWindow}
+              contextWindow={settings.contextWindowMeterEnabled ? activeContextWindow : null}
               {...(draftId ? { draftId } : {})}
               activeProjectName={activeProject?.title}
               activeProjectScripts={activeProject ? activeProjectScripts : undefined}
