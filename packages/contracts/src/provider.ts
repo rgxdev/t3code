@@ -138,6 +138,44 @@ export class ProviderUploadFeedbackError extends Schema.TaggedError<ProviderUplo
   }
 }
 
+export const ProviderGetContextUsageInput = Schema.Struct({
+  threadId: ThreadId,
+});
+export type ProviderGetContextUsageInput = typeof ProviderGetContextUsageInput.Type;
+
+const ProviderContextUsageItem = Schema.Struct({
+  name: Schema.String,
+  tokens: Schema.Number,
+});
+
+export const ProviderGetContextUsageResult = Schema.Struct({
+  totalTokens: Schema.Number,
+  maxTokens: Schema.Number,
+  categories: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      tokens: Schema.Number,
+      kind: Schema.Literals(["used", "free", "buffer", "deferred"]),
+    }),
+  ),
+  mcpTools: Schema.Array(ProviderContextUsageItem),
+  memoryFiles: Schema.Array(ProviderContextUsageItem),
+  agents: Schema.Array(ProviderContextUsageItem),
+});
+export type ProviderGetContextUsageResult = typeof ProviderGetContextUsageResult.Type;
+
+export class ProviderGetContextUsageError extends Schema.TaggedError<ProviderGetContextUsageError>()(
+  "ProviderGetContextUsageError",
+  {
+    threadId: ThreadId,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    return `Failed to read context usage for thread ${this.threadId}.`;
+  }
+}
+
 const ProviderEventKind = Schema.Literals(["session", "notification", "request", "error"]);
 
 export const ProviderEvent = Schema.Struct({

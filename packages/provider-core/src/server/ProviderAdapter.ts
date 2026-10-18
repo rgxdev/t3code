@@ -1,4 +1,7 @@
-import type { OrchestrationV2HistoricalMessage } from "@t3tools/contracts";
+import type {
+  OrchestrationV2HistoricalMessage,
+  ProviderGetContextUsageResult,
+} from "@t3tools/contracts";
 import {
   ChatAttachment,
   CheckpointId,
@@ -615,6 +618,9 @@ export interface ProviderAdapterV2SessionRuntime {
     readonly providerThread: OrchestrationV2ProviderThread;
     readonly reason?: string;
   }) => Effect.Effect<{ readonly feedbackId: string }, ProviderAdapterV2Error>;
+  readonly getContextUsage?: (input: {
+    readonly providerThread: OrchestrationV2ProviderThread;
+  }) => Effect.Effect<ProviderGetContextUsageResult, ProviderAdapterV2Error>;
   /**
    * Absent means apps from this provider are not interactive and their tool
    * calls stay plain tool rows.

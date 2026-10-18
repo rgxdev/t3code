@@ -34,6 +34,7 @@ import {
   type SpawnedProcess as ClaudeSpawnedProcess,
   type SDKAssistantMessage,
   type SDKAPIRetryMessage,
+  type SDKControlGetContextUsageResponse,
   type SDKMessage,
   type SDKRateLimitInfo,
   type SDKResultMessage,
@@ -418,6 +419,10 @@ export interface ClaudeAgentSdkQuerySession {
   readonly backgroundTasks: (
     toolUseId: string,
   ) => Effect.Effect<boolean, ClaudeAgentSdkQueryRunnerError>;
+  readonly getContextUsage?: Effect.Effect<
+    SDKControlGetContextUsageResponse,
+    ClaudeAgentSdkQueryRunnerError
+  >;
   readonly interrupt: Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly close: Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
 }
@@ -927,6 +932,10 @@ export const layerQueryRunner: Layer.Layer<
                 }),
               ),
             ),
+          getContextUsage: Effect.tryPromise({
+            try: () => queryRuntime.getContextUsage(),
+            catch: (cause) => queryRunnerError(cause, "getContextUsage"),
+          }),
           interrupt: Effect.tryPromise({
             try: () => queryRuntime.interrupt(),
             catch: (cause) => queryRunnerError(cause, "interrupt"),
@@ -8826,6 +8835,43 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               message: { ...turnInput.message, text: "/compact" },
             }),
           steerTurn,
+          getContextUsage: ({ providerThread }) =>
+            Effect.gen(function* () {
+              const liveQuery = yield* Ref.get(queryContext);
+              if (
+                liveQuery === null ||
+                liveQuery.stopping ||
+                liveQuery.nativeThreadId !== providerThread.nativeThreadRef?.nativeId ||
+                liveQuery.query.getContextUsage === undefined
+              ) {
+                return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: CLAUDE_PROVIDER,
+                  detail: "No live Claude query belongs to this provider thread",
+                });
+              }
+              const usage = yield* liveQuery.query.getContextUsage.pipe(
+                Effect.mapError(
+                  (cause) =>
+                    new ProviderAdapter.ProviderAdapterProtocolError({
+                      driver: CLAUDE_PROVIDER,
+                      detail: "Context usage request failed",
+                      cause,
+                    }),
+                ),
+              );
+              return {
+                totalTokens: usage.totalTokens,
+                maxTokens: usage.rawMaxTokens,
+                categories: usage.categories.map(({ name, tokens, kind }) => ({
+                  name,
+                  tokens,
+                  kind,
+                })),
+                mcpTools: usage.mcpTools.map(({ name, tokens }) => ({ name, tokens })),
+                memoryFiles: usage.memoryFiles.map(({ path, tokens }) => ({ name: path, tokens })),
+                agents: usage.agents.map(({ agentType, tokens }) => ({ name: agentType, tokens })),
+              };
+            }),
           stopTask: ({ providerThread, taskId }) =>
             Effect.gen(function* () {
               const liveQuery = yield* Ref.get(queryContext);

@@ -7,6 +7,7 @@ import * as NodeStream from "node:stream";
 
 import type {
   Query as ClaudeQuery,
+  SDKControlGetContextUsageResponse,
   SDKMessage,
   SDKResultMessage,
   SDKUserMessage,
@@ -2338,6 +2339,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     readonly backgroundTasks?: (
       toolUseId: string,
     ) => Effect.Effect<boolean, ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError>;
+    readonly getContextUsage?: ClaudeAdapterV2.ClaudeAgentSdkQuerySession["getContextUsage"];
     readonly environment?: NodeJS.ProcessEnv;
     readonly subagentLaunchToolUseId?: string;
     readonly nativeSessionId?: string;
@@ -2457,6 +2459,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   }),
                 backgroundTasks: options?.backgroundTasks ?? (() => Effect.succeed(false)),
                 stopTask: options?.stopTask ?? (() => Effect.void),
+                ...(options?.getContextUsage ? { getContextUsage: options.getContextUsage } : {}),
                 interrupt: options?.interrupt ?? Effect.void,
                 close: options?.close?.(sdkMessages) ?? Effect.void,
               };
@@ -4920,6 +4923,69 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         );
         assert.isFalse(yield* harness.hasPendingBackgroundWork);
         assert.lengthOf(harness.continuationRequests, 0);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+    ),
+  );
+
+  it.effect("reads the live query's context breakdown for its own provider thread", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarnessWithOptions({
+          getContextUsage: Effect.succeed<SDKControlGetContextUsageResponse>({
+            categories: [
+              { name: "Messages", tokens: 260_100, color: "blue", kind: "used" },
+              { name: "Free space", tokens: 653_600, color: "gray", kind: "free" },
+            ],
+            totalTokens: 313_300,
+            maxTokens: 967_000,
+            rawMaxTokens: 1_000_000,
+            percentage: 31,
+            gridRows: [],
+            model: "claude-opus-5-5",
+            memoryFiles: [{ path: "/repo/CLAUDE.md", type: "Project", tokens: 900 }],
+            mcpTools: [{ name: "mcp__t3__read", serverName: "t3", tokens: 400 }],
+            agents: [{ agentType: "developer", source: "user", tokens: 100 }],
+            isAutoCompactEnabled: true,
+            apiUsage: null,
+          }),
+        });
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("attempt-claude-context-usage"),
+            text: "How full is the context?",
+            attachments: [],
+          }),
+        );
+        const getContextUsage = harness.runtime.getContextUsage!;
+        assert.deepEqual(yield* getContextUsage({ providerThread: harness.providerThread }), {
+          totalTokens: 313_300,
+          maxTokens: 1_000_000,
+          categories: [
+            { name: "Messages", tokens: 260_100, kind: "used" },
+            { name: "Free space", tokens: 653_600, kind: "free" },
+          ],
+          mcpTools: [{ name: "mcp__t3__read", tokens: 400 }],
+          memoryFiles: [{ name: "/repo/CLAUDE.md", tokens: 900 }],
+          agents: [{ name: "developer", tokens: 100 }],
+        });
+        const otherThread = {
+          ...harness.providerThread,
+          nativeThreadRef: {
+            driver: harness.providerThread.driver,
+            nativeId: "other-session",
+            strength: "strong" as const,
+          },
+        };
+        assert.isTrue(
+          Exit.isFailure(yield* getContextUsage({ providerThread: otherThread }).pipe(Effect.exit)),
+        );
       }).pipe(
         Effect.provide(
           Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),

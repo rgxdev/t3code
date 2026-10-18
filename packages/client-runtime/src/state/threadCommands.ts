@@ -16,6 +16,7 @@ import {
   createAtomCommandScheduler,
   createEnvironmentCommand,
   createEnvironmentRpcCommand,
+  createEnvironmentRpcQueryAtomFamily,
 } from "./runtime.ts";
 import {
   type ThreadCommandInput,
@@ -403,6 +404,12 @@ export function createThreadEnvironmentAtoms<R, E>(
       tag: WS_METHODS.providerUploadFeedback,
       scheduler,
       concurrency,
+    }),
+    contextUsage: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:thread:context-usage",
+      tag: WS_METHODS.providerGetContextUsage,
+      staleTimeMs: 0,
+      idleTtlMs: 0,
     }),
   };
   const optimistic = createOptimisticThreadLifecycle(snapshotAtom);
