@@ -73,6 +73,7 @@ import {
   ProjectSearchEntriesError,
   ProjectWriteFileError,
   ProjectMutationError,
+  ProviderGetContextUsageError,
   ProviderUploadFeedbackError,
   ProviderSetupError,
   RelayClientInstallFailedError,
@@ -258,6 +259,7 @@ import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 
 const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
 const isProviderUploadFeedbackError = Schema.is(ProviderUploadFeedbackError);
+const isProviderGetContextUsageError = Schema.is(ProviderGetContextUsageError);
 
 const resolveDiscoveryForConfig = <A, E, R>(
   discovery: Effect.Effect<A, E, R>,
@@ -2278,6 +2280,38 @@ const layerWsRpc = (
                     threadId: input.threadId,
                     cause,
                   }),
+            ),
+          ),
+        [WS_METHODS.providerGetContextUsage]: (input) =>
+          Effect.gen(function* () {
+            const unavailable = (cause: string) =>
+              Effect.fail(new ProviderGetContextUsageError({ threadId: input.threadId, cause }));
+            const projection = yield* threadManagement.getThreadRecords(input.threadId, [
+              "providerThreads",
+            ]);
+            const providerThread = projection.providerThreads.find(
+              (candidate) => candidate.id === projection.thread.activeProviderThreadId,
+            );
+            if (providerThread === undefined || providerThread.providerSessionId === null) {
+              return yield* unavailable("No provider session has run in this thread yet.");
+            }
+            const runtime = Option.getOrNull(
+              yield* providerSessionsV2.get(providerThread.providerSessionId),
+            );
+            if (runtime === null) {
+              return yield* unavailable("The provider session is no longer running.");
+            }
+            if (runtime.getContextUsage === undefined) {
+              return yield* unavailable(
+                `Provider '${runtime.driver}' does not report a context breakdown.`,
+              );
+            }
+            return yield* runtime.getContextUsage({ providerThread });
+          }).pipe(
+            Effect.mapError((cause) =>
+              isProviderGetContextUsageError(cause)
+                ? cause
+                : new ProviderGetContextUsageError({ threadId: input.threadId, cause }),
             ),
           ),
         [WS_METHODS.serverUpdateProvider]: (input) =>

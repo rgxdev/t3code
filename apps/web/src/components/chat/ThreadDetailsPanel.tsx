@@ -26,8 +26,10 @@ import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/con
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
   THREAD_DETAILS_PANEL_LABEL_CLASS,
-  THREAD_DETAILS_PANEL_ROW_CLASS,
 } from "./threadDetailsPanelStyles";
+import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { ThreadDetailsControl } from "./ThreadDetailsControl";
+import { ThreadContextBreakdown } from "./ThreadContextBreakdown";
 
 const GitActionsControl = memo(BaseGitActionsControl);
 
@@ -153,19 +155,29 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
               ) : null}
 
               {props.contextWindow ? (
-                <div className={`flex items-center ${THREAD_DETAILS_PANEL_ROW_CLASS}`}>
-                  <GaugeIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
-                  <span className={`flex-1 ${THREAD_DETAILS_PANEL_LABEL_CLASS}`}>Context</span>
-                  <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-                    {props.contextWindow.usedPercentage !== null
-                      ? `${Math.round(props.contextWindow.usedPercentage)}% · `
-                      : ""}
-                    {formatContextWindowTokens(props.contextWindow.usedTokens)}
-                    {props.contextWindow.maxTokens != null
-                      ? `/${formatContextWindowTokens(props.contextWindow.maxTokens)}`
-                      : ""}
-                  </span>
-                </div>
+                <Popover>
+                  <PopoverTrigger render={<ThreadDetailsControl variant="ghost" size="sm" />}>
+                    <GaugeIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
+                    <span className={`flex-1 text-left ${THREAD_DETAILS_PANEL_LABEL_CLASS}`}>
+                      Context
+                    </span>
+                    <span className="font-mono text-2xs tabular-nums text-muted-foreground">
+                      {props.contextWindow.usedPercentage !== null
+                        ? `${Math.round(props.contextWindow.usedPercentage)}% · `
+                        : ""}
+                      {formatContextWindowTokens(props.contextWindow.usedTokens)}
+                      {props.contextWindow.maxTokens != null
+                        ? `/${formatContextWindowTokens(props.contextWindow.maxTokens)}`
+                        : ""}
+                    </span>
+                  </PopoverTrigger>
+                  <PopoverPopup side="left" align="start" width="md">
+                    <ThreadContextBreakdown
+                      environmentId={props.environmentId}
+                      threadId={props.threadId}
+                    />
+                  </PopoverPopup>
+                </Popover>
               ) : null}
             </div>
           </ThreadDetailsSection>
